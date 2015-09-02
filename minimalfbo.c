@@ -16,68 +16,126 @@ int const fbo_height = 2048;
 
 GLuint fb, color, depth;
 
+GLuint texture_background;
+GLuint texture_old_draw;
 
-void write_bmp_header(FILE *f, int w, int h) {
-	int filesize = 54 + 3*w*h;
-	unsigned char bmpfileheader[14] = {'B','M', 0,0,0,0, 0,0, 0,0, 54,0,0,0};
-	unsigned char bmpinfoheader[40] = {40,0,0,0, 0,0,0,0, 0,0,0,0, 1,0, 24,0};
-	unsigned char bmppad[3] = {0,0,0};
+void save_image_to_file(GLuint fb, int width, int height)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, fb);
+	glViewport(0,0, width, height);
 
-	bmpfileheader[ 2] = (unsigned char)(filesize    );
-	bmpfileheader[ 3] = (unsigned char)(filesize>> 8);
-	bmpfileheader[ 4] = (unsigned char)(filesize>>16);
-	bmpfileheader[ 5] = (unsigned char)(filesize>>24);
 
-	bmpinfoheader[ 4] = (unsigned char)(       w    );
-	bmpinfoheader[ 5] = (unsigned char)(       w>> 8);
-	bmpinfoheader[ 6] = (unsigned char)(       w>>16);
-	bmpinfoheader[ 7] = (unsigned char)(       w>>24);
-	bmpinfoheader[ 8] = (unsigned char)(       h    );
-	bmpinfoheader[ 9] = (unsigned char)(       h>> 8);
-	bmpinfoheader[10] = (unsigned char)(       h>>16);
-	bmpinfoheader[11] = (unsigned char)(       h>>24);
+    // Image Writing
+    unsigned char * imageData = (unsigned char *) malloc( width * height * 4 );
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
 
-	fwrite(bmpfileheader,1,14,f);
-	fwrite(bmpinfoheader,1,40,f);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    FILE *file;
+    // open texture data
+    file = fopen("draw.data", "w");
+    if (file == NULL)
+        return ;
+
+    // read texture data
+    fwrite(imageData, width * height * 4, 1, file);
+    fclose(file);
+
+	free(imageData);
+	printf("saving successful\n");
 }
 
-void save_current_framebuffer(int w, int h) {
-	size_t buffer_size = w * h * 3;
-	char * rawImageBuffer = (char*)malloc(buffer_size);
-	glReadPixels(0, 0, w-1, h-1, GL_RGB, GL_UNSIGNED_BYTE, rawImageBuffer);
+GLuint raw_texture_load_4(const char *filename, int width, int height)
+{
+    GLuint texture;
+    unsigned char *data;
+    FILE *file;
 
+    // open texture data
+    file = fopen(filename, "rb");
+    if (file == NULL)
+        return 0;
 
-	FILE *f = fopen("framebuffer.bmp", "wb");
-	assert(f != NULL);
+    // allocate buffer
+    data = (unsigned char*) malloc(width * height * 4);
 
-	write_bmp_header(f, w, h);
-	fwrite(rawImageBuffer, buffer_size, 1, f);
-	fclose(f);
+    // read texture data
+    fread(data, width * height * 4, 1, file);
+    fclose(file);
+
+    // allocate a texture name
+    glGenTextures(1, &texture);
+
+    // select our current texture
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    // select modulate to mix texture with color for shading
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_DECAL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_DECAL);
+
+    // when texture area is small, bilinear filter the closest mipmap
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+
+    // when texture area is large, bilinear filter the first mipmap
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // texture should tile
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    // build our texture mipmaps
+    gluBuild2DMipmaps(GL_TEXTURE_2D, 4, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+    // free buffer
+    free(data);
+
+    return texture;
 }
 
 /** framebuffer olusturup caydanlik ciziyor.  */
 void prepare() {
-	static float a=0, b=0, c=0;
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glEnable(GL_TEXTURE_2D);
 
+	glEnable(GL_TEXTURE_2D);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fb);
 	glViewport(0,0, fbo_width, fbo_height);
 
 	glClearColor(1,1,1,0);
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+
+	texture_old_draw = raw_texture_load_4("draw.data", fbo_width, fbo_height);
+	if (texture_old_draw != 0) {
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, texture_old_draw);
+
+
+		glPushMatrix();
+		glBegin( GL_QUADS );
+			glTexCoord2d(0.0,0.0); glVertex2d(-1.0,-1.0);
+			glTexCoord2d(1.0,0.0); glVertex2d(+1.0,-1.0);
+			glTexCoord2d(1.0,1.0); glVertex2d(+1.0,+1.0);
+			glTexCoord2d(0.0,1.0); glVertex2d(-1.0,+1.0);
+		glEnd();
+		glPopMatrix();
+
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glDisable(GL_BLEND);
+	}
+
 }
 
 void cizim_yap() {
 	printf("cizim_yap\n");
 
-
-//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glBindTexture(GL_TEXTURE_2D, color);
 //	glEnable(GL_TEXTURE_2D);
-	glBindFramebuffer(GL_FRAMEBUFFER, fb);
-	glViewport(0,0, fbo_width, fbo_height);
+
+
 
 
 	float r = (rand() % 80 + 20) / 50.0;
@@ -85,17 +143,30 @@ void cizim_yap() {
 	float color2 = (rand() % 100) / 100.0;
 	float color3 = (rand() % 100) / 100.0;
 
+	printf("color1 %f\ncolor2 %f\ncolor3 %f\n", color1, color2, color3);
+
 	glPushMatrix();
+	glBindFramebuffer(GL_FRAMEBUFFER, fb);
+	glViewport(0,0, fbo_width, fbo_height);
 
 	glLineWidth(30);
+
+	//glClear(GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 	glColor3f(color1, color2, color3);
+	glRotatef( 180, 1.0f, 0.0f, 0.0f );
+
 	glBegin(GL_LINES);
-		glVertex2f(0.0, r-1);
-		glVertex2f(0.5, r-1);
+		glVertex2f(0.0, -0.5);
+		glVertex2f(0.5, -0.5);
 	glEnd();
 	glPopMatrix();
 
+	//glClearColor(1, 1, 1, 0);
 
+
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 }
 
@@ -111,10 +182,7 @@ void keyboardCB(unsigned char key, int x, int y)
 
     case 's':
     case 'S':
-    	glBindFramebuffer(GL_FRAMEBUFFER, fb);
-    	glViewport(0,0, fbo_width, fbo_height);
-    	save_current_framebuffer(fbo_width, fbo_height);
-    	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    	save_image_to_file(fb, fbo_width, fbo_height);
         break;
     case 'a':
     case 'A':
@@ -123,7 +191,7 @@ void keyboardCB(unsigned char key, int x, int y)
     default:
         ;
     }
-    glutPostRedisplay();
+    //glutPostRedisplay();
 }
 
 int main(int argc, char *argv[])
@@ -143,6 +211,8 @@ int main(int argc, char *argv[])
 
 	prepare();
 	//save_current_framebuffer(fbo_width, fbo_height);
+
+	texture_background = raw_texture_load_4("/home/ttayfur/opengl_deneme/code_opengl/mini.data", 630, 354);
 
 	glutMainLoop();
 
@@ -200,25 +270,16 @@ void init()
 	CHECK_FRAMEBUFFER_STATUS();
 }
 
-
-
-
-
-
 float donus_hizi = 10;
 
 /** nasil yaptigini bilmiyorum fakat bir sekilde prepare fonksiyonunda cizilen caydanligi
 	4 kere cizip hareket ettiriyor */
 void final() {
-	static float a=0, b=0, c=0;
 
 	const int win_width  = glutGet(GLUT_WINDOW_WIDTH);
 	const int win_height = glutGet(GLUT_WINDOW_HEIGHT);
-	const float aspect = (float)win_width/(float)win_height;
 
 	// ######################################################################
-
-	//cizim_yap();
 
 	if (flag_cizim_yap) {
 		flag_cizim_yap = 0;
@@ -228,25 +289,19 @@ void final() {
 	// ######################################################################
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 	glViewport(0,0, win_width, win_height);
+
 	glClearColor(1.,1.,1.,0.);
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
 
-	glPushMatrix();
 
-
-	glRotatef(180, 0, 0, 1);
-
-
-	////////////////////////////////
+	/* slayt resmi */
 	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, color);
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
+	glBindTexture(GL_TEXTURE_2D, texture_background);
+	glPushMatrix();
+	//glRotatef( 180, 0.0f, 0.0f, 1.0f );
+	glRotatef( 180, 1.0f, 0.0f, 0.0f );
 
 
 	glBegin( GL_QUADS );
@@ -255,22 +310,37 @@ void final() {
 		glTexCoord2d(1.0,1.0); glVertex2d(+1.0,+1.0);
 		glTexCoord2d(0.0,1.0); glVertex2d(-1.0,+1.0);
 	glEnd();
+	glPopMatrix();
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glDisable(GL_BLEND);
 
-	///////////////////////////////////7
+
+
+
+	////////////////////////////////
+	/* cizim resmi */
+	glColor3f(1, 1, 1); // arka plana beyaz saydam rek
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, color);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glPushMatrix();
+	glRotatef( 180, 1.0f, 0.0f, 0.0f );
+	glBegin( GL_QUADS );
+		glTexCoord2d(0.0,0.0); glVertex2d(-1.0,-1.0);
+		glTexCoord2d(1.0,0.0); glVertex2d(+1.0,-1.0);
+		glTexCoord2d(1.0,1.0); glVertex2d(+1.0,+1.0);
+		glTexCoord2d(0.0,1.0); glVertex2d(-1.0,+1.0);
+	glEnd();
+	glPopMatrix();
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-
-
-//	glLineWidth(2.5);
-//	glColor3f(1.0, 0, 0);
-//	glBegin(GL_LINES);
-//		glVertex2f(0.0, 0.0);
-//		glVertex2f(0.5, 0);
-//	glEnd();
-
-
-	glPopMatrix();
 	glDisable(GL_BLEND);
+	///////////////////////////////////7
+
+
 
 }
 

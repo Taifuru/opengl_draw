@@ -4,6 +4,8 @@ framebuffer.bmp
 .cproject
 .project
 .settings
+draw.data
+
 
 # Object files
 *.o
