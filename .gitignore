@@ -1,3 +1,10 @@
+# Bizim dosyalar
+Debug/
+framebuffer.bmp
+.cproject
+.project
+.settings
+
 # Object files
 *.o
 *.ko
