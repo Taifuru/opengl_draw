@@ -138,6 +138,8 @@ void prepare() {
 float onceki_px, onceki_py;
 
 void cizim_yap() {
+	if(mouseLeftDown == 1) {
+
 	printf("cizim_yap\n");
 
 //	glBindTexture(GL_TEXTURE_2D, color);
@@ -161,7 +163,7 @@ void cizim_yap() {
 	glColor3f(color1, color2, color3);
 	glRotatef( 180, 1.0f, 0.0f, 0.0f );
 
-	if(mouseLeftDown == 1) {
+
 		const int win_width  = glutGet(GLUT_WINDOW_WIDTH);
 		const int win_height = glutGet(GLUT_WINDOW_HEIGHT);
 		printf("x: %d -- y: %d\n", mouseX, mouseY);
@@ -182,7 +184,7 @@ void cizim_yap() {
 		onceki_py = py;
 
 
-	}
+
 
 	// cizgi cizme
 //	glBegin(GL_LINES);
@@ -198,6 +200,8 @@ void cizim_yap() {
 
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	}
 
 }
 
