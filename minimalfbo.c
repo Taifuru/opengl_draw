@@ -132,6 +132,7 @@ void prepare() {
 		glDisable(GL_BLEND);
 	}
 
+
 }
 
 float onceki_px, onceki_py;
