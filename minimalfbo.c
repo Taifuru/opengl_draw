@@ -10,6 +10,12 @@ void init();
 void display();
 void prepare();
 
+int mouseX = 0;
+int mouseY = 0;
+int mouseLeftDown = 0;
+int screenWidth = 630;
+int screenHeight = 354;
+
 /** istedigimiz boyutta frame buffer olustrabiliyoruz */
 int const fbo_width = 2048;
 int const fbo_height = 2048;
@@ -113,7 +119,6 @@ void prepare() {
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, texture_old_draw);
 
-
 		glPushMatrix();
 		glBegin( GL_QUADS );
 			glTexCoord2d(0.0,0.0); glVertex2d(-1.0,-1.0);
@@ -129,37 +134,62 @@ void prepare() {
 
 }
 
+float onceki_px, onceki_py;
+
 void cizim_yap() {
 	printf("cizim_yap\n");
 
 //	glBindTexture(GL_TEXTURE_2D, color);
 //	glEnable(GL_TEXTURE_2D);
 
-
-
-
 	float r = (rand() % 80 + 20) / 50.0;
 	float color1 = (rand() % 100) / 100.0;
 	float color2 = (rand() % 100) / 100.0;
 	float color3 = (rand() % 100) / 100.0;
 
-	printf("color1 %f\ncolor2 %f\ncolor3 %f\n", color1, color2, color3);
+	//printf("color1 %f\ncolor2 %f\ncolor3 %f\n", color1, color2, color3);
 
 	glPushMatrix();
 	glBindFramebuffer(GL_FRAMEBUFFER, fb);
 	glViewport(0,0, fbo_width, fbo_height);
 
-	glLineWidth(30);
+	//glLineWidth(30);
 
 	//glClear(GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glColor3f(color1, color2, color3);
 	glRotatef( 180, 1.0f, 0.0f, 0.0f );
 
-	glBegin(GL_LINES);
-		glVertex2f(0.0, -0.5);
-		glVertex2f(0.5, -0.5);
-	glEnd();
+	if(mouseLeftDown == 1) {
+		const int win_width  = glutGet(GLUT_WINDOW_WIDTH);
+		const int win_height = glutGet(GLUT_WINDOW_HEIGHT);
+		printf("x: %d -- y: %d\n", mouseX, mouseY);
+		float px = ((float)mouseX / win_width) * 2 - 1;
+		float py = ((float)mouseY / win_height) * -2 + 1;
+
+		glLineWidth(30);
+
+		glBegin(GL_LINES);
+			glVertex2f(onceki_px, onceki_py);
+			glVertex2f(px, py);
+		glEnd();
+
+		printf("%f,%f - %f,%f\n", onceki_px, onceki_py, px, py);
+
+
+		onceki_px = px;
+		onceki_py = py;
+
+
+	}
+
+	// cizgi cizme
+//	glBegin(GL_LINES);
+//		glVertex2f(0.0, -0.5);
+//		glVertex2f(0.5, -0.5);
+//	glEnd();
+
+
 	glPopMatrix();
 
 	//glClearColor(1, 1, 1, 0);
@@ -194,6 +224,38 @@ void keyboardCB(unsigned char key, int x, int y)
     //glutPostRedisplay();
 }
 
+void mouseCB(int button, int state, int x, int y)
+{
+	if(button == GLUT_LEFT_BUTTON)
+	{
+		if(state == GLUT_DOWN)
+		{
+			const int win_width  = glutGet(GLUT_WINDOW_WIDTH);
+			const int win_height = glutGet(GLUT_WINDOW_HEIGHT);
+			float px = ((float)x / win_width) * 2 - 1;
+			float py = ((float)y / win_height) * -2 + 1;
+			onceki_px = px;
+			onceki_py = py;
+			mouseLeftDown = 1;
+			//printf("mouseLeftDown %d\n", mouseLeftDown);
+		}
+		else {
+			mouseLeftDown = 0;
+		}
+	}
+	//cizim_yap();
+}
+
+void mouseMotionCB(int x, int y)
+{
+    if(mouseLeftDown == 1)
+    {
+        mouseX = x;
+        mouseY = y;
+        cizim_yap();
+    }
+}
+
 int main(int argc, char *argv[])
 {
 	glutInit(&argc, argv);
@@ -202,10 +264,13 @@ int main(int argc, char *argv[])
 	glutCreateWindow("FBO test");
 	glutDisplayFunc(display);
 	glutIdleFunc(glutPostRedisplay);
+	glutInitWindowSize(screenWidth, screenHeight);
 
 	glewInit();
 
     glutKeyboardFunc(keyboardCB);
+    glutMouseFunc(mouseCB);
+    glutMotionFunc(mouseMotionCB);
 
 	init();
 
