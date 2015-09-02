@@ -278,7 +278,7 @@ int main(int argc, char *argv[])
 	prepare();
 	//save_current_framebuffer(fbo_width, fbo_height);
 
-	texture_background = raw_texture_load_4("/home/ttayfur/opengl_deneme/code_opengl/mini.data", 630, 354);
+	texture_background = raw_texture_load_4("mini.data", 630, 354);
 
 	glutMainLoop();
 
